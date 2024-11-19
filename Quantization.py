@@ -1,68 +1,34 @@
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
+import random
 
-def quantization(image, k):
-    centroids, memberships = kmeans(image, 100, k)
-    rows, cols, channels = image.shape
-    cnt = 0
-    for row in range(rows):
-        for col in range(cols):
-            image[row, col] = centroids[memberships[cnt]]
-            cnt += 1
+def color_quantization(image, max_iteration, k):
+    centroids, memberships = kmeans(image, max_iteration, k)
+    rows, cols, _ = image.shape
+    quantized_image = np.array([centroids[cluster] for cluster in memberships], dtype=np.uint8)
+    quantized_image = quantized_image.reshape(rows, cols, -1)
+    print(f"Quantization Complete! Image reduced to {k} colors.")
+    return quantized_image
 
-
-
-def get_color_data(image):
-    data = []
-    rows, cols, channels = image.shape
-    for row in range(rows):
-        for col in range(cols):
-            pixel_value = image[row, col]
-            data.append(pixel_value)
-
-    return data
-
-def kmeans(image,max_iterations,k):
-    dataset = np.array(get_color_data(image))
-    centroids = np.full((k, 3), 0, dtype=float)
-    Z = np.full((len(X), k), 0, dtype=int)
-    memberships = np.full(len(X), 0, dtype=int)
-
-    for centroid in centroids:
-        for color_index in centroid:
-            centroid[color_index] = random.randint(0, 255)
+def kmeans(image, max_iterations, k):
+    dataset = image.reshape((-1, 3)).astype(float)
+    centroids = dataset[random.sample(range(len(dataset)), k)]
+    print("Data Initialization Complete")
 
     for i in range(max_iterations):
-        for point_index, point in enumerate(dataset):
-            min_index = 0
-            min_dist_sqr = 100000000000
-            for index, centroid in enumerate(centroids):
-                dist_sqr = 0
-                for color_index in range(3):
-                    dist_sqr += (centroid[color_index] - point[color_index]) ** 2
-                if dist_sqr < min_dist_sqr:
-                    min_dist_sqr = dist_sqr
-                    min_index = index
-            for index in range(k):
-                if min_index == index:
-                    Z[point_index][index] = 1
-                else:
-                    Z[point_index][index] = 0
-
-        for index in range(len(centroids)):
-            cnt = 0
-            sum = np.array([0, 0, 0], dtype=float)
-            for pointIndex, point in enumerate(X):
-                if(Z[pointIndex][index] == 1) :
-                    cnt += 1
-                    sum += point
-            if(cnt > 0):
-                centroids[index] = sum / cnt
-
-    for pointIndex in range(len(X)):
-        for index, Zvalue in enumerate(Z[pointIndex]):
-            if Zvalue == 1:
-                memberships[pointIndex] = index
-                break
+        print(f"Iteration {i + 1}/{max_iterations}...")
+        distances = np.linalg.norm(dataset[:, np.newaxis] - centroids, axis=2)
+        memberships = np.argmin(distances, axis=1)
+        for cluster in range(k):
+            points_in_cluster = dataset[memberships == cluster]
+            if len(points_in_cluster) > 0:
+                centroids[cluster] = points_in_cluster.mean(axis=0)
+    print("KMeans Complete")
     return centroids, memberships
+
+image = cv2.imread("./rose.jpg")
+cv2.imshow("Original Image", image)
+result_image = color_quantization(image, 10, 7)
+cv2.imshow("Quantized Image", result_image)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
