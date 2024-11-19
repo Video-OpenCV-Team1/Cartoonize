@@ -1,9 +1,11 @@
 import cv2
 import numpy as np
 import HumanDetection
+import Quantization
+import pencilDraw
 from torchvision.models.detection import maskrcnn_resnet50_fpn
 
-imageLink = 'input.png'
+imageLink = 'rose.jpg'
 videoLink = 'input.mp4'
 
 # 1 : 실시간 이미지 처리, 2 : input.png 이미지 처리, 3 : input.mp4 영상 처리
@@ -23,6 +25,20 @@ def get_binary_image(human_detection):
 
     return tmp
 
+def composite(image):
+    mask = HumanDetection.detect_people_and_generate_matrix(image)
+    mask = mask.astype(np.uint8)
+    pencil_sketch = pencilDraw.process_image_to_sketch(image, mask)
+    quant = Quantization.color_quantization(image, mask, 10, 7)
+
+    normalized_pencil_sketch = pencil_sketch.astype(np.float32) / 255.0
+    normalized_pencil_sketch = cv2.merge([normalized_pencil_sketch] * 3)
+    multiplied = (normalized_pencil_sketch * quant).astype(np.uint8)
+
+    final_image = np.where(mask[:, :, None] == 0, image, multiplied)
+    cv2.imshow('final_image', final_image)
+
+    return final_image
 
 # Mask R-CNN 모델 로드 (한 번만 로드하여 재사용)
 HumanDetection.model = maskrcnn_resnet50_fpn(pretrained=True)
@@ -42,14 +58,27 @@ if type == 1:
                     break
 
                 # 사람 인식 확인용
-                binary = HumanDetection.detect_people_and_generate_matrix(frame)
-                tmp = get_binary_image(binary)
+                # binary = HumanDetection.detect_people_and_generate_matrix(frame)
+                # clust = Quantization.color_quantization(frame, binary, 10, 7)
+                # draw = pencilDraw.process_image_to_sketch(frame, binary)
+                # tmp = np.zeros((binary.shape[0], binary.shape[1], 3), dtype=np.uint8)
+                #
+                # mask = draw > 240
+                # tmp[mask] = np.array(
+                #     [np.full_like(draw[mask], 1), np.full_like(draw[mask], 1), np.full_like(draw[mask], 1)]).T
+                #
+                # cv2.imshow('tmp', tmp)
+                #
+                # tmp = tmp * clust
+                #
+                # cv2.imshow('result', tmp)
+                # cv2.imshow('Cartoon', clust)
+                # cv2.imshow('Source', frame)
+                draw = composite(frame)
 
-                cv2.imshow('Cartoon', tmp)
-                cv2.imshow('Source', frame)
+                cv2.imshow('pencil', draw)
             else:
                 break
-
     cam.release()
 elif type == 2:
     try:
@@ -60,8 +89,10 @@ elif type == 2:
         print(imageLink + '을/를 찾을 수 없습니다.')
         quit()
 
-    hExist = HumanDetection.detect_people_and_generate_matrix(image)
-    cv2.imwrite('Output.png', hExist)
+    clust = composite(image)
+
+    cv2.imwrite('Output.png', clust)
+    cv2.waitKey(0)
 elif type == 3:
     try:
         video = cv2.VideoCapture(videoLink)
@@ -79,12 +110,8 @@ elif type == 3:
             while True:
                 ret, frame = video.read()
                 if ret :
-                    cv2.imshow('Source', frame)
-                    hExist = HumanDetection.detect_people_and_generate_matrix(frame)
-                    r = get_binary_image(hExist)
+                    r = composite(frame)
                     output.write(r)
-                    cv2.imshow('Detect', r)
-                    cv2.waitKey(2)
                 else:
                     print("비디오가 종료되었습니다.")
                     break

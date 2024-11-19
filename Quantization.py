@@ -44,15 +44,15 @@ def kmeans(dataset, max_iterations, k):
     print("KMeans Complete")
     return centroids, memberships
 
-# Load an image
-image = cv2.imread("./rose.jpg")
-human_data = np.random.randint(0, 3, size=image.shape[:2])  # Random labels for testing
-
-cv2.imshow("Original Image", image)
-cv2.imshow("Human Data", (human_data * 127).astype(np.uint8))  # Visualize human_data
-
-# Perform color quantization
-result_image = color_quantization(image, human_data, 10, 7)
-cv2.imshow("Quantized Image", result_image)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+# # Load an image
+# image = cv2.imread("./rose.jpg")
+# human_data = np.random.randint(0, 3, size=image.shape[:2])  # Random labels for testing
+#
+# cv2.imshow("Original Image", image)
+# cv2.imshow("Human Data", (human_data * 127).astype(np.uint8))  # Visualize human_data
+#
+# # Perform color quantization
+# result_image = color_quantization(image, human_data, 10, 7)
+# cv2.imshow("Quantized Image", result_image)
+# cv2.waitKey(0)
+# cv2.destroyAllWindows()

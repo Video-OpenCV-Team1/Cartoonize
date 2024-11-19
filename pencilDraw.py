@@ -35,7 +35,7 @@ class PencilDraw:
             raise ValueError("마스크를 정의하기 전 이미지/영상가 있어야 합니다.")
         if mask.shape[:2] != self.image.shape[:2]:
             raise ValueError("마스크 차원과 이미지 차원이 일치해야 합니다.")
-        self.mask = mask
+        self.mask = (mask > 0).astype(np.uint8)
 
     def convert_to_grayscale(self):
         """
