@@ -40,10 +40,8 @@ if __name__ == "__main__":
 
     # 함수 호출
     result = detect_people_and_generate_matrix(image)
-    np.set_printoptions(threshold=np.inf)
-    print(result)
-    # # 결과 시각화
-    # plt.imshow(result, cmap="jet")
-    # plt.colorbar()
-    # plt.title("Return Matrix (People IDs)")
-    # plt.show()
+    # 결과 시각화
+    plt.imshow(result, cmap="jet")
+    plt.colorbar()
+    plt.title("Return Matrix (People IDs)")
+    plt.show()
