@@ -135,3 +135,36 @@ def apply_gaussian_filter(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
             roi = padded_image[i:i + kernel_size, j:j + kernel_size]
             filtered_image[i, j] = np.sum(roi * kernel)
     return filtered_image
+
+
+def process_image_to_sketch(image: np.ndarray, mask: np.ndarray, kernel_size: int = 11, sigma: float = 5) -> np.ndarray:
+    """
+    주어진 이미지를 스케치 이미지로 변환하는 전체 과정을 실행하는 함수
+    매개변수:
+        image: numpy.ndarray
+            입력 이미지 (3채널 RGB 이미지)
+        mask: numpy.ndarray
+            사람 영역을 나타내는 이진 마스크 (0: 배경, 1: 사람)
+        kernel_size: int
+            가우시안 커널 크기 (기본값: 11, 홀수여야 함)
+        sigma: float
+            가우시안의 표준 편차 (기본값: 5)
+    리턴:
+        sketch_image: numpy.ndarray
+            최종 스케치 이미지
+    """
+    pencil_draw = PencilDraw()
+
+    # 이미지와 마스크 설정
+    pencil_draw.set_image(image)
+    pencil_draw.set_mask(mask)
+
+    # 처리 단계 수행
+    pencil_draw.convert_to_grayscale()
+    pencil_draw.create_inverted_image()
+    pencil_draw.apply_gaussian_blur(kernel_size=kernel_size, sigma=sigma)
+    pencil_draw.invert_blurred_image()
+    pencil_draw.create_sketch()
+
+    # 결과 반환
+    return pencil_draw.get_sketch()
