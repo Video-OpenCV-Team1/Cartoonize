@@ -73,10 +73,18 @@ elif type == 3:
             fps = video.get(cv2.CAP_PROP_FPS)  # 또는 cap.get(5)
             print('프레임 너비: %d, 프레임 높이: %d, 길이: %d, 초당 프레임 수: %d' % (width, height, length, fps))
 
+            fourcc = cv2.VideoWriter_fourcc(*'DIVX')
+            output = cv2.VideoWriter('Output.mp4', fourcc, fps, (int(width), int(height)))
+
             while True:
                 ret, frame = video.read()
                 if ret :
                     cv2.imshow('Source', frame)
+                    hExist = HumanDetection.detect_people_and_generate_matrix(frame)
+                    r = get_binary_image(hExist)
+                    output.write(r)
+                    cv2.imshow('Detect', r)
+                    cv2.waitKey(2)
                 else:
                     print("비디오가 종료되었습니다.")
                     break
