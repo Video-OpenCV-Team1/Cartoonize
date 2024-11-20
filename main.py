@@ -1,130 +1,175 @@
+import sys
 import cv2
 import numpy as np
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QLabel, QPushButton, QVBoxLayout,
+    QFileDialog, QComboBox, QSlider, QHBoxLayout
+)
+from PyQt5.QtCore import Qt
+from torchvision.models.detection import maskrcnn_resnet50_fpn
 import HumanDetection
 import Quantization
 import pencilDraw
-from torchvision.models.detection import maskrcnn_resnet50_fpn
 
-imageLink = 'rose.jpg'
-videoLink = 'input.mp4'
+class CartoonizerApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Cartoonizer App")
+        self.resize(600, 400)
 
-# 1 : 실시간 이미지 처리, 2 : input.png 이미지 처리, 3 : input.mp4 영상 처리
-type = 3
+        self.type = 1
+        self.imageLink = "rose.jpg"
+        self.videoLink = "input.mp4"
+        self.clusters = 10
+        self.quant_level = 7
 
-def cartoonize(image):
-    print('Cartoonizing...')
-    return image
+        # GUI Layout
+        layout = QVBoxLayout()
 
-def get_binary_image(human_detection):
-    # numpy 배열로 변환하여 계산을 벡터화
-    tmp = np.zeros((human_detection.shape[0], human_detection.shape[1], 3), dtype=np.uint8)
+        # 작업 유형 선택
+        self.type_label = QLabel("Select Task:")
+        layout.addWidget(self.type_label)
+        self.type_selector = QComboBox()
+        self.type_selector.addItems(["1: Real-time (Webcam)", "2: Process Image", "3: Process Video"])
+        self.type_selector.currentIndexChanged.connect(self.change_task_type)
+        layout.addWidget(self.type_selector)
 
-    # human_detection 배열을 0이 아닌 값들에 대해서 처리
-    mask = human_detection != 0
-    tmp[mask] = np.array([human_detection[mask] / 8 * 255, human_detection[mask] / 8 * 255, np.full_like(human_detection[mask], 255)]).T
+        # 파일 선택 버튼
+        self.file_button = QPushButton("Select File (Image/Video)")
+        self.file_button.clicked.connect(self.select_file)
+        layout.addWidget(self.file_button)
 
-    return tmp
+        # 클러스터와 양자화 단계 조정 슬라이더
+        self.slider_layout = QHBoxLayout()
 
-def composite(image):
-    mask = HumanDetection.detect_people_and_generate_matrix(image)
-    mask = mask.astype(np.uint8)
-    pencil_sketch = pencilDraw.process_image_to_sketch(image, mask)
-    quant = Quantization.color_quantization(image, mask, 10, 7)
+        self.cluster_label = QLabel("Clusters:")
+        self.cluster_slider = QSlider(Qt.Horizontal)
+        self.cluster_slider.setRange(1, 20)
+        self.cluster_slider.setValue(self.clusters)
+        self.cluster_slider.valueChanged.connect(self.update_clusters)
+        self.slider_layout.addWidget(self.cluster_label)
+        self.slider_layout.addWidget(self.cluster_slider)
 
-    normalized_pencil_sketch = pencil_sketch.astype(np.float32) / 255.0
-    normalized_pencil_sketch = cv2.merge([normalized_pencil_sketch] * 3)
-    multiplied = (normalized_pencil_sketch * quant).astype(np.uint8)
+        self.quant_label = QLabel("Quant Level:")
+        self.quant_slider = QSlider(Qt.Horizontal)
+        self.quant_slider.setRange(1, 10)
+        self.quant_slider.setValue(self.quant_level)
+        self.quant_slider.valueChanged.connect(self.update_quant_level)
+        self.slider_layout.addWidget(self.quant_label)
+        self.slider_layout.addWidget(self.quant_slider)
 
-    final_image = np.where(mask[:, :, None] == 0, image, multiplied)
-    cv2.imshow('final_image', final_image)
+        layout.addLayout(self.slider_layout)
 
-    return final_image
+        # Start Processing 버튼
+        self.start_button = QPushButton("Start Processing")
+        self.start_button.clicked.connect(self.start_processing)
+        layout.addWidget(self.start_button)
 
-# Mask R-CNN 모델 로드 (한 번만 로드하여 재사용)
-HumanDetection.model = maskrcnn_resnet50_fpn(pretrained=True)
-HumanDetection.model.eval()  # 추론 모드로 전환
+        # 로그 및 상태 표시
+        self.log_label = QLabel("Status: Ready")
+        layout.addWidget(self.log_label)
 
-if type == 1:
-    cam = cv2.VideoCapture(0)
+        self.setLayout(layout)
 
-    if cam.isOpened():
-        while True:
-            ret, frame = cam.read()
-            if ret:
-                if cv2.waitKey(1) != -1:
-                    break
+        # Initialize HumanDetection model
+        HumanDetection.model = maskrcnn_resnet50_fpn(pretrained=True)
+        HumanDetection.model.eval()
 
-                if cv2.waitKey(1) == ord('s'):
-                    break
+    def change_task_type(self, index):
+        self.type = index + 1
+        self.log_label.setText(f"Task type set to: {self.type}")
 
-                # 사람 인식 확인용
-                # binary = HumanDetection.detect_people_and_generate_matrix(frame)
-                # clust = Quantization.color_quantization(frame, binary, 10, 7)
-                # draw = pencilDraw.process_image_to_sketch(frame, binary)
-                # tmp = np.zeros((binary.shape[0], binary.shape[1], 3), dtype=np.uint8)
-                #
-                # mask = draw > 240
-                # tmp[mask] = np.array(
-                #     [np.full_like(draw[mask], 1), np.full_like(draw[mask], 1), np.full_like(draw[mask], 1)]).T
-                #
-                # cv2.imshow('tmp', tmp)
-                #
-                # tmp = tmp * clust
-                #
-                # cv2.imshow('result', tmp)
-                # cv2.imshow('Cartoon', clust)
-                # cv2.imshow('Source', frame)
-                draw = composite(frame)
+    def select_file(self):
+        if self.type == 2:
+            file_name, _ = QFileDialog.getOpenFileName(self, "Select Image File", "", "Image Files (*.png *.jpg *.jpeg)")
+            if file_name:
+                self.imageLink = file_name
+                self.log_label.setText(f"Selected Image: {file_name}")
+        elif self.type == 3:
+            file_name, _ = QFileDialog.getOpenFileName(self, "Select Video File", "", "Video Files (*.mp4 *.avi)")
+            if file_name:
+                self.videoLink = file_name
+                self.log_label.setText(f"Selected Video: {file_name}")
 
-                cv2.imshow('pencil', draw)
-            else:
-                break
-    cam.release()
-elif type == 2:
-    try:
-        image = cv2.imread(imageLink)
-        #cv2.imshow('image', image)
+    def update_clusters(self, value):
+        self.clusters = value
+        self.cluster_label.setText(f"Clusters: {value}")
 
-    except:
-        print(imageLink + '을/를 찾을 수 없습니다.')
-        quit()
+    def update_quant_level(self, value):
+        self.quant_level = value
+        self.quant_label.setText(f"Quant Level: {value}")
 
-    clust = composite(image)
+    def start_processing(self):
+        self.log_label.setText("Processing started...")
+        if self.type == 1:
+            self.process_webcam()
+        elif self.type == 2:
+            self.process_image()
+        elif self.type == 3:
+            self.process_video()
+        self.log_label.setText("Processing completed!")
 
-    cv2.imwrite('Output.png', clust)
-    cv2.waitKey(0)
-elif type == 3:
-    try:
-        video = cv2.VideoCapture(videoLink)
-        if video.isOpened():
-
-            width = video.get(cv2.CAP_PROP_FRAME_WIDTH)  #
-            height = video.get(cv2.CAP_PROP_FRAME_HEIGHT)
-            length = video.get(cv2.CAP_PROP_FRAME_COUNT)
-            fps = video.get(cv2.CAP_PROP_FPS)  # 또는 cap.get(5)
-            print('프레임 너비: %d, 프레임 높이: %d, 길이: %d, 초당 프레임 수: %d' % (width, height, length, fps))
-
-            fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-            output = cv2.VideoWriter('Output.mp4', fourcc, fps, (int(width), int(height)))
-
+    def process_webcam(self):
+        cam = cv2.VideoCapture(0)
+        if cam.isOpened():
             while True:
+                ret, frame = cam.read()
+                if ret:
+                    processed_frame = self.composite(frame)
+                    cv2.imshow("Processed Frame", processed_frame)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+        cam.release()
+        cv2.destroyAllWindows()
+
+    def process_image(self):
+        try:
+            image = cv2.imread(self.imageLink)
+            processed_image = self.composite(image)
+            cv2.imshow("Processed Image", processed_image)
+            cv2.imwrite("Processed_Image.png", processed_image)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+        except Exception as e:
+            self.log_label.setText(f"Error: {e}")
+
+    def process_video(self):
+        try:
+            video = cv2.VideoCapture(self.videoLink)
+            width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fps = video.get(cv2.CAP_PROP_FPS)
+            fourcc = cv2.VideoWriter_fourcc(*'DIVX')
+            output = cv2.VideoWriter('Processed_Video.mp4', fourcc, fps, (width, height))
+
+            while video.isOpened():
                 ret, frame = video.read()
-                if ret :
-                    r = composite(frame)
-                    output.write(r)
-                else:
-                    print("비디오가 종료되었습니다.")
+                if not ret:
                     break
-        else:
-            print(videoLink + '을/를 찾을 수 없습니다.')
-    except:
-        print(videoLink + '을/를 찾을 수 없습니다.')
-        quit()
+                processed_frame = self.composite(frame)
+                output.write(processed_frame)
 
-    video.release()
-    cv2.destroyAllWindows()
+            video.release()
+            output.release()
+            self.log_label.setText("Video processing completed!")
+        except Exception as e:
+            self.log_label.setText(f"Error: {e}")
 
-else:
-    print('정확한 작업을 입력해주세요.')
+    def composite(self, image):
+        mask = HumanDetection.detect_people_and_generate_matrix(image)
+        mask = mask.astype(np.uint8)
+        pencil_sketch = pencilDraw.process_image_to_sketch(image, mask)
+        quant = Quantization.color_quantization(image, mask, self.clusters, self.quant_level)
 
-cv2.destroyAllWindows()
+        normalized_pencil_sketch = pencil_sketch.astype(np.float32) / 255.0
+        normalized_pencil_sketch = cv2.merge([normalized_pencil_sketch] * 3)
+        multiplied = (normalized_pencil_sketch * quant).astype(np.uint8)
+
+        final_image = np.where(mask[:, :, None] == 0, image, multiplied)
+        return final_image
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = CartoonizerApp()
+    window.show()
+    sys.exit(app.exec_())
