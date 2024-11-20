@@ -115,6 +115,25 @@ class CartoonizerApp(QWidget):
             while True:
                 ret, frame = cam.read()
                 if ret:
+
+                    # 사람 인식 확인용
+                    # binary = HumanDetection.detect_people_and_generate_matrix(frame)
+                    # clust = Quantization.color_quantization(frame, binary, 10, 7)
+                    # draw = pencilDraw.process_image_to_sketch(frame, binary)
+                    # tmp = np.zeros((binary.shape[0], binary.shape[1], 3), dtype=np.uint8)
+                    #
+                    # mask = draw > 240
+                    # tmp[mask] = np.array(
+                    #     [np.full_like(draw[mask], 1), np.full_like(draw[mask], 1), np.full_like(draw[mask], 1)]).T
+                    #
+                    # cv2.imshow('tmp', tmp)
+                    #
+                    # tmp = tmp * clust
+                    #
+                    # cv2.imshow('result', tmp)
+                    # cv2.imshow('Cartoon', clust)
+                    # cv2.imshow('Source', frame)
+
                     processed_frame = self.composite(frame)
                     cv2.imshow("Processed Frame", processed_frame)
                     if cv2.waitKey(1) & 0xFF == ord('q'):
