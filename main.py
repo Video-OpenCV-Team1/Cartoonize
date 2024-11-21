@@ -20,8 +20,8 @@ class CartoonizerApp(QWidget):
         self.type = 1
         self.imageLink = "rose.jpg"
         self.videoLink = "input.mp4"
-        self.clusters = 10
-        self.quant_level = 7
+        self.iterations = 10  # iterations로 변수 이름 수정
+        self.clusters = 7  # clusters로 변수 이름 수정
 
         # GUI Layout
         layout = QVBoxLayout()
@@ -39,24 +39,24 @@ class CartoonizerApp(QWidget):
         self.file_button.clicked.connect(self.select_file)
         layout.addWidget(self.file_button)
 
-        # 클러스터와 양자화 단계 조정 슬라이더
+        # 클러스터와 반복 횟수 조정 슬라이더
         self.slider_layout = QHBoxLayout()
+
+        self.iteration_label = QLabel("Iterations:")
+        self.iteration_slider = QSlider(Qt.Horizontal)
+        self.iteration_slider.setRange(1, 20)
+        self.iteration_slider.setValue(self.iterations)
+        self.iteration_slider.valueChanged.connect(self.update_iterations)
+        self.slider_layout.addWidget(self.iteration_label)
+        self.slider_layout.addWidget(self.iteration_slider)
 
         self.cluster_label = QLabel("Clusters:")
         self.cluster_slider = QSlider(Qt.Horizontal)
-        self.cluster_slider.setRange(1, 20)
+        self.cluster_slider.setRange(1, 10)
         self.cluster_slider.setValue(self.clusters)
         self.cluster_slider.valueChanged.connect(self.update_clusters)
         self.slider_layout.addWidget(self.cluster_label)
         self.slider_layout.addWidget(self.cluster_slider)
-
-        self.quant_label = QLabel("Quant Level:")
-        self.quant_slider = QSlider(Qt.Horizontal)
-        self.quant_slider.setRange(1, 10)
-        self.quant_slider.setValue(self.quant_level)
-        self.quant_slider.valueChanged.connect(self.update_quant_level)
-        self.slider_layout.addWidget(self.quant_label)
-        self.slider_layout.addWidget(self.quant_slider)
 
         layout.addLayout(self.slider_layout)
 
@@ -91,13 +91,13 @@ class CartoonizerApp(QWidget):
                 self.videoLink = file_name
                 self.log_label.setText(f"Selected Video: {file_name}")
 
+    def update_iterations(self, value):
+        self.iterations = value
+        self.iteration_label.setText(f"Iterations: {value}")
+
     def update_clusters(self, value):
         self.clusters = value
         self.cluster_label.setText(f"Clusters: {value}")
-
-    def update_quant_level(self, value):
-        self.quant_level = value
-        self.quant_label.setText(f"Quant Level: {value}")
 
     def start_processing(self):
         self.log_label.setText("Processing started...")
@@ -115,25 +115,6 @@ class CartoonizerApp(QWidget):
             while True:
                 ret, frame = cam.read()
                 if ret:
-
-                    # 사람 인식 확인용
-                    # binary = HumanDetection.detect_people_and_generate_matrix(frame)
-                    # clust = Quantization.color_quantization(frame, binary, 10, 7)
-                    # draw = pencilDraw.process_image_to_sketch(frame, binary)
-                    # tmp = np.zeros((binary.shape[0], binary.shape[1], 3), dtype=np.uint8)
-                    #
-                    # mask = draw > 240
-                    # tmp[mask] = np.array(
-                    #     [np.full_like(draw[mask], 1), np.full_like(draw[mask], 1), np.full_like(draw[mask], 1)]).T
-                    #
-                    # cv2.imshow('tmp', tmp)
-                    #
-                    # tmp = tmp * clust
-                    #
-                    # cv2.imshow('result', tmp)
-                    # cv2.imshow('Cartoon', clust)
-                    # cv2.imshow('Source', frame)
-
                     processed_frame = self.composite(frame)
                     cv2.imshow("Processed Frame", processed_frame)
                     if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -178,7 +159,7 @@ class CartoonizerApp(QWidget):
         mask = HumanDetection.detect_people_and_generate_matrix(image)
         mask = mask.astype(np.uint8)
         pencil_sketch = pencilDraw.process_image_to_sketch(image, mask)
-        quant = Quantization.color_quantization(image, mask, self.clusters, self.quant_level)
+        quant = Quantization.color_quantization(image, mask, self.iterations, self.clusters)
 
         normalized_pencil_sketch = pencil_sketch.astype(np.float32) / 255.0
         normalized_pencil_sketch = cv2.merge([normalized_pencil_sketch] * 3)
