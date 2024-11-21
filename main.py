@@ -11,6 +11,8 @@ import HumanDetection
 import Quantization
 import pencilDraw
 
+std = 230
+
 class CartoonizerApp(QWidget):
     def __init__(self):
         super().__init__()
@@ -115,7 +117,7 @@ class CartoonizerApp(QWidget):
             while True:
                 ret, frame = cam.read()
                 if ret:
-                    processed_frame = self.composite(frame)
+                    processed_frame = self.composite(frame, std)
                     cv2.imshow("Processed Frame", processed_frame)
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         break
@@ -125,7 +127,7 @@ class CartoonizerApp(QWidget):
     def process_image(self):
         try:
             image = cv2.imread(self.imageLink)
-            processed_image = self.composite(image)
+            processed_image = self.composite(image, std)
             cv2.imshow("Processed Image", processed_image)
             cv2.imwrite("Processed_Image.png", processed_image)
             cv2.waitKey(0)
@@ -146,7 +148,7 @@ class CartoonizerApp(QWidget):
                 ret, frame = video.read()
                 if not ret:
                     break
-                processed_frame = self.composite(frame)
+                processed_frame = self.composite(frame, std)
                 output.write(processed_frame)
 
             video.release()
@@ -155,14 +157,14 @@ class CartoonizerApp(QWidget):
         except Exception as e:
             self.log_label.setText(f"Error: {e}")
 
-    def composite(self, image):
+    def composite(self, image, edgeStd):
         mask = HumanDetection.detect_people_and_generate_matrix(image)
         mask = mask.astype(np.uint8)
         pencil_sketch = pencilDraw.process_image_to_sketch(image, mask)
         quant = Quantization.color_quantization(image, mask, self.iterations, self.clusters)
 
-        normalized_pencil_sketch = pencil_sketch.astype(np.float32) / 255.0
-        normalized_pencil_sketch = cv2.merge([normalized_pencil_sketch] * 3)
+        m = pencil_sketch > edgeStd
+        normalized_pencil_sketch = np.where(m[..., None], [1, 1, 1], [0, 0, 0]).astype(np.float32)
         multiplied = (normalized_pencil_sketch * quant).astype(np.uint8)
 
         final_image = np.where(mask[:, :, None] == 0, image, multiplied)
